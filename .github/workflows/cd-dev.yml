@@ -1,0 +1,63 @@
+name: CD – Dev
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: cd-dev
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Build & deploy to dev
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df  # v4.2.1
+        with:
+          role-to-assume: ${{ secrets.APP_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076  # v2.0.1
+
+      - name: Build and push image
+        env:
+          ECR_REPOSITORY_URL: ${{ secrets.ECR_REPOSITORY_URL }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$ECR_REPOSITORY_URL:$IMAGE_TAG" -t "$ECR_REPOSITORY_URL:latest" .
+          docker push "$ECR_REPOSITORY_URL:$IMAGE_TAG"
+          docker push "$ECR_REPOSITORY_URL:latest"
+
+      - name: Download task definition
+        env:
+          TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$TASK_DEFINITION" \
+            --query taskDefinition \
+            --output json > task-definition.json
+
+      - name: Render updated task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@6853cfae8c3a7d978fbf68b5a55453395541dfbb  # v1.8.5
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ vars.ECS_CONTAINER_NAME }}
+          image: ${{ secrets.ECR_REPOSITORY_URL }}:${{ github.sha }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@8230edfe842008418c5275908cae75e51d3befb2  # v2.3.0
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ secrets.ECS_SERVICE_NAME }}
+          cluster: ${{ secrets.ECS_CLUSTER_NAME }}
+          wait-for-service-stability: true
