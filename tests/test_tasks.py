@@ -81,3 +81,9 @@ def test_delete_task():
 def test_delete_task_not_found():
     r = client.delete("/tasks/99")
     assert r.status_code == 404
+
+
+def test_summit():
+    r = client.get("/summit")
+    assert r.status_code == 200
+    assert r.json() == {"message": "Olá, AWS Summit SP!!"}
