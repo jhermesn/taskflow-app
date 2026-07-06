@@ -59,3 +59,8 @@ def delete_task(task_id: int):
     if task_id not in _tasks:
         raise HTTPException(404, _TASK_NOT_FOUND)
     del _tasks[task_id]
+
+
+@app.get("/summit")
+def summit():
+    return {"message": "Olá, AWS Summit SP!!"}
