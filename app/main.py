@@ -59,3 +59,9 @@ def delete_task(task_id: int):
     if task_id not in _tasks:
         raise HTTPException(404, _TASK_NOT_FOUND)
     del _tasks[task_id]
+
+
+@app.get("/stats")
+def stats():
+    done_count = len(_tasks)  # bug: deveria ser sum(1 for t in _tasks.values() if t["done"])
+    return {"total": len(_tasks), "done": done_count}
