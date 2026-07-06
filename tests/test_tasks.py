@@ -81,3 +81,13 @@ def test_delete_task():
 def test_delete_task_not_found():
     r = client.delete("/tasks/99")
     assert r.status_code == 404
+
+
+def test_stats():
+    client.post("/tasks", json={"title": "a", "done": True})
+    client.post("/tasks", json={"title": "b", "done": False})
+    r = client.get("/stats")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] == 2
+    assert data["done"] == 1  # falha: endpoint retorna 2 (contando todas as tasks)
